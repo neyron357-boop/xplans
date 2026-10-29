@@ -3,23 +3,64 @@ import type { Change } from '../store/model';
 import { useStore } from '../store/store';
 import { activeLine, currentGoal, runwayLeft, setActive, setChange, setEnergy, snoozeRunway, toggleHabit, toggleStep } from '../store/actions';
 import { dayLabel } from '../lib/dates';
+import { tap } from '../lib/haptics';
 import { go } from '../lib/router';
-import { useToday } from '../lib/useToday';
+import { useMinute, useToday } from '../lib/useToday';
 import { BrokeSheet, ChanceSheet, HabitsSheet, MovedSheet, StepSheet } from '../sheets/TodaySheets';
 import { A } from '../ui/A';
 import { InstallHint } from '../ui/InstallHint';
 import { LineChip } from '../ui/LineChip';
+import { Sign, TONE } from '../ui/Sign';
 import { StepCard } from '../ui/StepCard';
 
 type SheetName = 'moved' | 'broke' | 'chance' | 'step' | 'habits';
 
-const SIGNS: Record<Change, { sign: string; tone: string; label: string; done: string }> = {
-  none: { sign: '=', tone: 'sign-muted sign-mono', label: 'Ничего', done: 'Ничего нового' },
-  moved: { sign: '●', tone: 'sign-main', label: 'Сдвинулось', done: 'Сдвинулось' },
-  broke: { sign: '○', tone: 'sign-closed', label: 'Сорвалось', done: 'Сорвалось' },
-  chance: { sign: '◆', tone: 'sign-ace', label: 'Возможность', done: 'Возможность' },
-  low: { sign: '‖', tone: 'sign-muted sign-mono', label: 'Нет сил', done: 'Отдых' },
+const WORDS: Record<Change, { label: string; done: string }> = {
+  none: { label: 'Ничего', done: 'Ничего нового' },
+  moved: { label: 'Сдвинулось', done: 'Сдвинулось' },
+  broke: { label: 'Сорвалось', done: 'Сорвалось' },
+  chance: { label: 'Возможность', done: 'Возможность' },
+  low: { label: 'Нет сил', done: 'Отдых' },
 };
+
+/** The day runs from 04:00 to 04:00; the dot walks the line. */
+function DayLine({ done }: { done: boolean }) {
+  const m = useMinute();
+  const pct = (((m - 240 + 1440) % 1440) / 1440) * 100;
+  return (
+    <div class={`dayline${done ? ' is-done' : ''}`} aria-hidden="true">
+      <span class="dayline__dot" style={{ left: `${pct.toFixed(1)}%` }} />
+    </div>
+  );
+}
+
+/** Five stems; the chosen one lights up and the answer settles a beat later. */
+function Stems({ value, onPick }: { value?: number; onPick: (n: number) => void }) {
+  const [picked, setPicked] = useState<number | null>(null);
+  const lit = picked ?? value ?? 0;
+  return (
+    <div class="stems" role="group" aria-label="Силы">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          class={`stem${n <= lit ? ' is-lit' : ''}${n === lit ? ' is-on' : ''}`}
+          style={{ '--n': String(n), '--h': `${12 + n * 14}px` }}
+          aria-pressed={value === n}
+          aria-label={`Силы: ${n} из 5`}
+          onClick={() => {
+            if (picked !== null) return;
+            tap();
+            setPicked(n);
+            setTimeout(() => onPick(n), 560);
+          }}
+        >
+          <span class="stem__bar" aria-hidden="true" />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** One question at a time: strength first, then what changed, then a quiet summary. */
 export function Today() {
@@ -39,6 +80,7 @@ export function Today() {
   const close = () => setSheet(null);
 
   const pick = (c: Change) => {
+    tap();
     if (c === 'none') setChange(today, 'none');
     else if (c === 'low') go('#/low');
     else setSheet(c);
@@ -46,12 +88,15 @@ export function Today() {
 
   return (
     <main class="screen">
-      <div class="between">
-        <span class="label">{dayLabel(today)}</span>
-        <A href="#/roots/aces" class="runway-pill" label={left === null ? 'Запас не задан' : `Запас на ${left} дн`}>
-          ◆ {left ?? '?'} дн
-        </A>
-      </div>
+      <header class="stack-16">
+        <div class="between">
+          <span class="label">{dayLabel(today)}</span>
+          <A href="#/roots/aces" class="runway-pill" label={left === null ? 'Запас не задан' : `Запас на ${left} дн`}>
+            ◆ {left ?? '?'} дн
+          </A>
+        </div>
+        <DayLine done={phase === 'done'} />
+      </header>
 
       <InstallHint />
 
@@ -79,38 +124,26 @@ export function Today() {
       )}
 
       {phase === 'energy' && (
-        <section class="stack-24">
+        <section key="energy" class="stack-24">
           <h1 class="title">Сколько сил?</h1>
-          <div class="bars">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                class="bar"
-                aria-pressed={log.energy === n}
-                aria-label={`Силы: ${n} из 5`}
-                onClick={() => {
-                  setEnergy(today, n);
-                  setReask(false);
-                }}
-              >
-                <span style={{ height: `${n * 16}px` }} />
-              </button>
-            ))}
-          </div>
+          <Stems
+            value={log.energy}
+            onPick={(n) => {
+              setEnergy(today, n);
+              setReask(false);
+            }}
+          />
         </section>
       )}
 
       {phase === 'change' && (
-        <section class="stack-24">
+        <section key="change" class="stack-24">
           <h1 class="title">Что изменилось?</h1>
           <div class="tiles">
             {(['none', 'moved', 'broke', 'chance', 'low'] as const).map((c) => (
-              <button key={c} type="button" class={`tile${c === 'low' ? ' tile--wide' : ''}`} onClick={() => pick(c)}>
-                <span class={`tile__sign ${SIGNS[c].tone}`} aria-hidden="true">
-                  {SIGNS[c].sign}
-                </span>
-                <span>{SIGNS[c].label}</span>
+              <button key={c} type="button" class={`tile${c === 'low' ? ' tile--wide' : ''}`} style={{ '--tone': TONE[c] }} onClick={() => pick(c)}>
+                <Sign kind={c} size={c === 'low' ? 24 : 28} />
+                <span>{WORDS[c].label}</span>
               </button>
             ))}
           </div>
@@ -118,14 +151,12 @@ export function Today() {
       )}
 
       {phase === 'done' && log.change && (
-        <section class="stack-16">
+        <section key="done" class="stack-16">
           <h1 class="title">Записано</h1>
           <div class="card summary">
-            <span class={`summary__sign ${SIGNS[log.change].tone}`} aria-hidden="true">
-              {SIGNS[log.change].sign}
-            </span>
+            <Sign kind={log.change} size={24} />
             <span class="grow stack-4">
-              <span>{SIGNS[log.change].done}</span>
+              <span>{WORDS[log.change].done}</span>
               {log.note && <span class="small muted">{log.note}</span>}
             </span>
             <button type="button" class="ghost" onClick={() => setChange(today, undefined)}>
@@ -136,7 +167,7 @@ export function Today() {
       )}
 
       {phase !== 'energy' && (
-        <section class="stack-8">
+        <section key="step" class="stack-8">
           <div class="between">
             <span class="label row">
               Шаг дня
@@ -153,7 +184,10 @@ export function Today() {
               line={line}
               energy={log.energy}
               done={log.stepDone && log.stepLineId === line.id}
-              onToggle={() => toggleStep(today, line.id)}
+              onToggle={() => {
+                tap();
+                toggleStep(today, line.id);
+              }}
               onEdit={() => setSheet('step')}
             />
           ) : (
@@ -174,7 +208,16 @@ export function Today() {
         {habits.length > 0 ? (
           <div class="habits">
             {habits.map((h) => (
-              <button key={h.id} type="button" class="habit" aria-pressed={!!log.habits?.includes(h.id)} onClick={() => toggleHabit(today, h.id)}>
+              <button
+                key={h.id}
+                type="button"
+                class="habit"
+                aria-pressed={!!log.habits?.includes(h.id)}
+                onClick={() => {
+                  tap();
+                  toggleHabit(today, h.id);
+                }}
+              >
                 <span class="habit__ring" aria-hidden="true" />
                 <span>{h.name}</span>
               </button>

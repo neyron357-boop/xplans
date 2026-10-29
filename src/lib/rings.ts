@@ -23,8 +23,8 @@ export interface RingsLayout {
 
 const TAU = Math.PI * 2;
 const MAX_YEARS = 4;
-/** Year labels sit at three o'clock; spread dots avoid that spot. */
-const LABEL_ANGLE = Math.PI / 2;
+/** Year labels sit at the top of their ring; spread dots avoid that spot. */
+const LABEL_GAP = 0.35;
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
@@ -81,7 +81,7 @@ export function ringsLayout(items: Memory[], arcs: Arc[], today: DayKey, size: n
     let spread = 0;
     const placed = group.map(({ m, a }) => {
       let angle = a ?? (3.9 + spread++ * 2.39996) % TAU;
-      if (a === null && Math.abs(angle - LABEL_ANGLE) < 0.35) angle += 0.7;
+      if (a === null && (angle < LABEL_GAP || angle > TAU - LABEL_GAP)) angle = LABEL_GAP + 0.3;
       return { m, angle };
     });
     placed.sort((p, q) => p.angle - q.angle);
@@ -129,7 +129,7 @@ export function ringsLayout(items: Memory[], arcs: Arc[], today: DayKey, size: n
 
   const nowR = radius.get(now.y);
   const nowA = yearFraction(now) * TAU;
-  const rings = years.map((y) => ({ r: radius.get(y) ?? outer, label: String(y), x: c + (radius.get(y) ?? outer), y: c + 4 }));
+  const rings = years.map((y) => ({ r: radius.get(y) ?? outer, label: String(y), x: c, y: c - (radius.get(y) ?? outer) + 4 }));
   if (groups.has(inner)) rings.unshift({ r: inner, label: 'раньше', x: c, y: c + 4 });
 
   return {

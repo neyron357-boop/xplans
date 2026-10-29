@@ -7,28 +7,49 @@ import { SwitchFlow } from './screens/Switch';
 import { Today } from './screens/Today';
 import { WhatIfFlow } from './screens/WhatIf';
 import { Nav } from './ui/Nav';
+import { Sky } from './ui/Sky';
+
+const ORDER = { today: 0, roots: 1, memory: 2 } as const;
+let lastTab = 0;
 
 export function App() {
   useStore();
   const route = useRoute();
 
-  // Flows take the whole screen, without the tab bar.
-  if (route.name === 'switch') return <div class="app"><SwitchFlow key={route.lineId} lineId={route.lineId} /></div>;
-  if (route.name === 'whatif') {
+  // Flows take the whole screen, without the tab bar, and rise from below.
+  if (route.name === 'switch' || route.name === 'whatif' || route.name === 'low') {
     return (
-      <div class="app">
-        <WhatIfFlow key={`${route.parentId}-${route.riskId}`} parentId={route.parentId} riskId={route.riskId} activate={route.activate} />
-      </div>
+      <>
+        <Sky />
+        <div class="app">
+          <div class="view view--flow" key={route.name}>
+            {route.name === 'switch' && <SwitchFlow key={route.lineId} lineId={route.lineId} />}
+            {route.name === 'whatif' && (
+              <WhatIfFlow key={`${route.parentId}-${route.riskId}`} parentId={route.parentId} riskId={route.riskId} activate={route.activate} />
+            )}
+            {route.name === 'low' && <LowFlow />}
+          </div>
+        </div>
+      </>
     );
   }
-  if (route.name === 'low') return <div class="app"><LowFlow /></div>;
+
+  // Tabs slide in from the side they sit on.
+  const i = ORDER[route.name];
+  const dir = i >= lastTab ? 1 : -1;
+  lastTab = i;
 
   return (
-    <div class="app">
-      {route.name === 'today' && <Today />}
-      {route.name === 'roots' && <RootsScreen tab={route.tab} />}
-      {route.name === 'memory' && <MemoryScreen />}
-      <Nav active={route.name} />
-    </div>
+    <>
+      <Sky />
+      <div class="app">
+        <div class="view" key={route.name} style={{ '--dir': String(dir) }}>
+          {route.name === 'today' && <Today />}
+          {route.name === 'roots' && <RootsScreen tab={route.tab} />}
+          {route.name === 'memory' && <MemoryScreen />}
+        </div>
+        <Nav active={route.name} />
+      </div>
+    </>
   );
 }

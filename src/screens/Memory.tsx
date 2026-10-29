@@ -38,7 +38,7 @@ export function MemoryScreen() {
       <Rings items={items} arcs={s.arcs} today={today} selectedId={cur?.id ?? null} onSelect={setSelId} />
 
       {cur ? (
-        <div class="card memory" aria-live="polite">
+        <div class="card memory" key={cur.id} aria-live="polite">
           <div class="between memory__top">
             <span class="label">{whenLabel(cur.when)}</span>
             <span class="row">

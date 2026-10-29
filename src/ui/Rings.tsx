@@ -12,12 +12,13 @@ interface Props {
   onSelect: (id: Id) => void;
 }
 
-/** A tap selects the nearest memory, so dots can sit close together. */
+/** The rings draw themselves from the inside out; a tap selects the nearest memory. */
 export function Rings({ items, arcs, today, selectedId, onSelect }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const size = Math.min(useWidth(box, 342), 420);
   const lay = useMemo(() => ringsLayout(items, arcs, today, size), [items, arcs, today, size]);
   const sel = lay.dots.find((d) => d.id === selectedId);
+  const ms = (n: number) => ({ '--d': `${n}ms` });
 
   const tap = (e: TargetedMouseEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -45,28 +46,29 @@ export function Rings({ items, arcs, today, selectedId, onSelect }: Props) {
         aria-label={`Годовые кольца: ${lay.rings.map((r) => r.label).join(', ')}`}
         onClick={tap}
       >
-        {lay.rings.map((r) => (
-          <circle key={r.label} class="rg" cx={lay.c} cy={lay.c} r={r.r} />
+        {lay.rings.map((r, i) => (
+          <circle key={r.label} class="rg rg-in" cx={lay.c} cy={lay.c} r={r.r} pathLength={1} style={ms(i * 140)} />
         ))}
-        {lay.past && <path class="rg-past" d={lay.past} />}
+        {lay.past && <path class="rg-past rg-in" d={lay.past} pathLength={1} style={ms(400)} />}
         {lay.links.map((d, i) => (
-          <path key={`l${i}`} class="rg-link" d={d} />
+          <path key={`l${i}`} class="rg-link rg-fade" d={d} style={ms(900 + i * 80)} />
         ))}
         {lay.done.map((d, i) => (
-          <path key={`d${i}`} class="rg-arc" d={d} />
+          <path key={`d${i}`} class="rg-arc rg-in" d={d} pathLength={1} style={ms(600 + i * 100)} />
         ))}
         {lay.plan.map((d, i) => (
-          <path key={`p${i}`} class="rg-plan" d={d} />
+          <path key={`p${i}`} class="rg-plan rg-fade" d={d} style={ms(1100 + i * 100)} />
+        ))}
+        {lay.dots.map((d, i) => (
+          <circle key={d.id} class={`rg-dot rg-dot--${d.kind} pop-in`} cx={d.x} cy={d.y} r={6} style={ms(500 + i * 60)} />
         ))}
         {lay.today && (
           <>
-            <circle class="rg-today-ring" cx={lay.today.x} cy={lay.today.y} r={8} />
-            <circle class="rg-today" cx={lay.today.x} cy={lay.today.y} r={3.5} />
+            <circle class="rg-today-pulse" cx={lay.today.x} cy={lay.today.y} r={8} />
+            <circle class="rg-today-ring pop-in" cx={lay.today.x} cy={lay.today.y} r={8} style={ms(800)} />
+            <circle class="rg-today pop-in" cx={lay.today.x} cy={lay.today.y} r={3.5} style={ms(700)} />
           </>
         )}
-        {lay.dots.map((d) => (
-          <circle key={d.id} class={`rg-dot rg-dot--${d.kind}`} cx={d.x} cy={d.y} r={6} />
-        ))}
         {sel && <circle class="rg-sel" cx={sel.x} cy={sel.y} r={11} />}
         <g class="rg-labels">
           {lay.rings.map((r) => (

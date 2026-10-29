@@ -6,7 +6,7 @@ import { daysBetween, plural } from '../lib/dates';
 import { take } from '../lib/handoff';
 import { kindOf } from '../lib/roots';
 import { go, rememberRootsTab, type RootsTab } from '../lib/router';
-import { useToday } from '../lib/useToday';
+import { useCountUp, useToday } from '../lib/useToday';
 import { AceSheet, CloseSheet, GoalSheet, LineSheet, RiskSheet, RunwaySheet } from '../sheets/RootsSheets';
 import { StepSheet } from '../sheets/TodaySheets';
 import { lineColor } from '../ui/LineChip';
@@ -18,9 +18,11 @@ export function RootsScreen({ tab }: { tab: RootsTab }) {
   return (
     <main class="screen">
       <Seg tab={tab} />
-      {tab === 'tree' && <Tree />}
-      {tab === 'ready' && <Ready />}
-      {tab === 'aces' && <Aces />}
+      <div class="tabview" key={tab}>
+        {tab === 'tree' && <Tree />}
+        {tab === 'ready' && <Ready />}
+        {tab === 'aces' && <Aces />}
+      </div>
     </main>
   );
 }
@@ -204,7 +206,7 @@ function Ready() {
       <div class="meter-row">
         <div class="meter" role="img" aria-label={`Готово ${n} из ${s.risks.length}`}>
           {s.risks.map((r, i) => (
-            <span key={r.id} class={i < n ? 'is-on' : ''} />
+            <span key={r.id} class={i < n ? 'is-on' : ''} style={{ '--n': String(i) }} />
           ))}
         </div>
         <span class="mono meter__count" aria-hidden="true">
@@ -244,6 +246,7 @@ function Aces() {
   const s = useStore();
   const today = useToday();
   const left = runwayLeft(s, today);
+  const shown = useCountUp(left) ?? left;
   const target = s.lines.find((l) => l.id === s.runway.lineId);
   const [open, setOpen] = useState<Id | null>(() => s.aces[0]?.id ?? null);
   const [sheet, setSheet] = useState<'runway' | 'new' | Ace | null>(null);
@@ -260,7 +263,7 @@ function Aces() {
           <span class="runway__empty">На сколько дней хватит денег?</span>
         ) : (
           <span class="runway__num">
-            <span class="display">{left}</span>
+            <span class="display">{shown}</span>
             <span class="muted">{plural(left, 'день', 'дня', 'дней')}</span>
           </span>
         )}

@@ -21,14 +21,22 @@ export interface Spot extends P {
   id: Id;
 }
 
+export interface Fiber {
+  id: Id;
+  d: string;
+  kind: Kind;
+  /** -1 grows upwards from its line, 1 downwards. */
+  dir: number;
+}
+
 export interface RootsLayout {
   origin: P;
   goal: P;
   bg: string[];
-  fibers: { d: string; kind: Kind }[];
+  fibers: Fiber[];
   threads: Thread[];
   chips: Spot[];
-  nodes: (P & { kind: Kind })[];
+  nodes: (Spot & { kind: Kind })[];
   here: P | null;
 }
 
@@ -127,17 +135,17 @@ export function layoutRoots(lines: Line[], activeId: Id | null | undefined, w: n
   const geo = new Map<Id, Seg[]>();
   const threads: Thread[] = [];
   const chips: Spot[] = [];
-  const nodes: (P & { kind: Kind })[] = [];
-  const fibers: { d: string; kind: Kind }[] = [];
+  const nodes: (Spot & { kind: Kind })[] = [];
+  const fibers: Fiber[] = [];
   let here: P | null = null;
 
   /** A thin hair off a line, pointing away from the trunk; shrinks near the edge. */
-  const fiber = (from: P, dir: number, dx: number[], dy: number[], kind: Kind) => {
+  const fiber = (id: Id, from: P, dir: number, dx: number[], dy: number[], kind: Kind) => {
     const room = dir < 0 ? from.y - 4 : h - 4 - from.y;
     const scale = Math.min(1, room / Math.max(...dy));
     if (scale < 0.25) return;
     const p = (i: number): P => ({ x: from.x + dx[i], y: from.y + dir * dy[i] * scale });
-    fibers.push({ d: `M${pt(from)} C${pt(p(0))}, ${pt(p(1))}, ${pt(p(2))}`, kind });
+    fibers.push({ id, d: `M${pt(from)} C${pt(p(0))}, ${pt(p(1))}, ${pt(p(2))}`, kind, dir });
   };
 
   for (const l of [center, ...up, ...down]) {
@@ -159,10 +167,10 @@ export function layoutRoots(lines: Line[], activeId: Id | null | undefined, w: n
     const peak = segs[0][3];
     chips.push({ id: l.id, ...bezier(segs[1], 0.5) });
     if (kind === 'main') here = peak;
-    else nodes.push({ ...peak, kind });
+    else nodes.push({ id: l.id, ...peak, kind });
     const dir = L < cy ? -1 : 1;
-    fiber(peak, dir, [22, 50, 86], [22, 34, 38], kind);
-    fiber(bezier(segs[0], 0.75), dir, [8, 18, 34], [22, 36, 48], kind);
+    fiber(l.id, peak, dir, [22, 50, 86], [22, 34, 38], kind);
+    fiber(l.id, bezier(segs[0], 0.75), dir, [8, 18, 34], [22, 36, 48], kind);
   }
 
   const rank: Record<Kind, number> = { closed: 0, backup: 1, main: 2 };
