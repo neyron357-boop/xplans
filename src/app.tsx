@@ -1,6 +1,8 @@
 import { useRoute } from './lib/router';
 import { useStore } from './store/store';
+import { GrowthScreen } from './screens/Growth';
 import { LowFlow } from './screens/Low';
+import { MeScreen } from './screens/Me';
 import { MemoryScreen } from './screens/Memory';
 import { RootsScreen } from './screens/Roots';
 import { SwitchFlow } from './screens/Switch';
@@ -9,7 +11,7 @@ import { WhatIfFlow } from './screens/WhatIf';
 import { Nav } from './ui/Nav';
 import { Sky } from './ui/Sky';
 
-const ORDER = { today: 0, roots: 1, memory: 2 } as const;
+const ORDER = { today: 0, roots: 1, growth: 2, memory: 3, me: 4 } as const;
 let lastTab = 0;
 
 export function App() {
@@ -46,7 +48,9 @@ export function App() {
         <div class="view" key={route.name} style={{ '--dir': String(dir) }}>
           {route.name === 'today' && <Today />}
           {route.name === 'roots' && <RootsScreen tab={route.tab} />}
+          {route.name === 'growth' && <GrowthScreen tab={route.tab} />}
           {route.name === 'memory' && <MemoryScreen />}
+          {route.name === 'me' && <MeScreen tab={route.tab} />}
         </div>
         <Nav active={route.name} />
       </div>

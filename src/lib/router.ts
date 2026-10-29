@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'preact/hooks';
 
 export type RootsTab = 'tree' | 'ready' | 'aces';
+export type GrowthTab = 'habits' | 'knowledge';
+export type MeTab = 'patterns' | 'code';
 
 export type Route =
   | { name: 'today' }
   | { name: 'roots'; tab: RootsTab }
+  | { name: 'growth'; tab: GrowthTab }
   | { name: 'memory' }
+  | { name: 'me'; tab: MeTab }
   | { name: 'switch'; lineId?: string }
   | { name: 'whatif'; parentId?: string; riskId?: string; activate: boolean }
   | { name: 'low' };
@@ -16,9 +20,28 @@ interface Entry {
   overlay?: boolean;
 }
 
-const TABS: RootsTab[] = ['tree', 'ready', 'aces'];
+interface SubTabs {
+  roots: RootsTab;
+  growth: GrowthTab;
+  me: MeTab;
+}
+
+/** Sections with tabs of their own. */
+export type Section = keyof SubTabs;
+
+const SUB: { [S in Section]: readonly SubTabs[S][] } = {
+  roots: ['tree', 'ready', 'aces'],
+  growth: ['habits', 'knowledge'],
+  me: ['patterns', 'code'],
+};
 const subs = new Set<() => void>();
-let lastRootsTab: RootsTab = 'tree';
+/** Each section reopens on the tab it was left on. */
+const lastTab: SubTabs = { roots: 'tree', growth: 'habits', me: 'patterns' };
+
+function subTab<S extends Section>(section: S, sub: string | undefined): SubTabs[S] {
+  const known: readonly string[] = SUB[section];
+  return sub && known.includes(sub) ? (sub as SubTabs[S]) : lastTab[section];
+}
 
 const entry = (): Entry => (history.state as Entry | null) ?? {};
 const depth = () => entry().xp ?? 0;
@@ -31,9 +54,13 @@ export function parseRoute(hash: string): Route {
   const param = (k: string) => q.get(k) ?? undefined;
   switch (head) {
     case 'roots':
-      return { name: 'roots', tab: TABS.includes(sub as RootsTab) ? (sub as RootsTab) : lastRootsTab };
+      return { name: 'roots', tab: subTab('roots', sub) };
+    case 'growth':
+      return { name: 'growth', tab: subTab('growth', sub) };
     case 'memory':
       return { name: 'memory' };
+    case 'me':
+      return { name: 'me', tab: subTab('me', sub) };
     case 'switch':
       return { name: 'switch', lineId: param('line') };
     case 'whatif':
@@ -57,10 +84,10 @@ export function back(fallback = '#/today') {
   else go(fallback, { replace: true });
 }
 
-export const rootsHref = () => `#/roots/${lastRootsTab}`;
+export const tabHref = (section: Section) => `#/${section}/${lastTab[section]}`;
 
-export function rememberRootsTab(tab: RootsTab) {
-  lastRootsTab = tab;
+export function rememberTab<S extends Section>(section: S, tab: SubTabs[S]) {
+  lastTab[section] = tab;
 }
 
 export function initRouter() {

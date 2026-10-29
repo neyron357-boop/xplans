@@ -56,15 +56,19 @@ export interface Runway {
   lineId: Id | null;
 }
 
+/** What a habit feeds: a line of the plan or the money runway. It gives the habit its colour. */
+export type HabitLink = { t: 'line'; id: Id } | { t: 'runway' };
+
 export interface Habit {
   id: Id;
   name: string;
   archived?: boolean;
+  link?: HabitLink;
 }
 
 export type Change = 'none' | 'moved' | 'broke' | 'chance' | 'low';
 
-/** Everything answered on one day. These are the signals the app will learn from. */
+/** Everything answered on one day. These are the signals the app learns from. */
 export interface DayLog {
   energy?: number;
   change?: Change;
@@ -72,7 +76,11 @@ export interface DayLog {
   stepDone?: boolean;
   stepLineId?: Id;
   habits?: Id[];
+  /** When each habit was marked done, in minutes after midnight. */
+  habitAt?: Record<Id, number>;
   runwaySnoozed?: boolean;
+  /** Pauses taken in the code. */
+  pauses?: number;
 }
 
 /** A date with as much precision as is known. */
@@ -111,6 +119,41 @@ export interface Risk {
   covers: Cover[];
 }
 
+/** A monthly self-check of a measured skill: how much was understood, in percent. */
+export interface Check {
+  day: DayKey;
+  value: number;
+}
+
+/** Something being learned, and the result it leads to. */
+export interface Study {
+  id: Id;
+  name: string;
+  /** The result it leads to, shown after the arrow. */
+  next?: string;
+  /** The line it helps; without one it waits for later. */
+  lineId?: Id;
+  /** Measured skills keep a starting estimate and a check once a month. */
+  measure?: { start?: { low: number; high: number }; checks: Check[] };
+  createdAt: DayKey;
+}
+
+/** Something XPlans understood from your words, with what helps. */
+export interface Trait {
+  id: Id;
+  text: string;
+  fix: string;
+}
+
+/** Your answer to a pattern: right or not so. */
+export type Verdict = 'yes' | 'no';
+
+/** A short personal rule of the code. */
+export interface Rule {
+  id: Id;
+  text: string;
+}
+
 export interface AppState {
   v: 1;
   createdAt: DayKey;
@@ -125,4 +168,9 @@ export interface AppState {
   memories: Memory[];
   risks: Risk[];
   backupAt: DayKey | null;
+  studies: Study[];
+  traits: Trait[];
+  /** Answers to patterns, by pattern key. */
+  verdicts: Record<string, Verdict>;
+  rules: Rule[];
 }

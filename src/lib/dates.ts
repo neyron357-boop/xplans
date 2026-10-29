@@ -42,6 +42,9 @@ export function dayLabel(k: DayKey): string {
   return `${WEEKDAYS[d.getDay()]} · ${d.getDate()} ${MONTHS_OF[d.getMonth()]}`;
 }
 
+/** Short month name of a day: окт, ноя. */
+export const monthShort = (k: DayKey) => MONTHS[parseDay(k).getMonth()];
+
 export function whenLabel(w: When | null): string {
   if (!w) return 'раньше';
   if (w.m && w.d) return `${w.d} ${MONTHS_OF[w.m - 1]} ${w.y}`;

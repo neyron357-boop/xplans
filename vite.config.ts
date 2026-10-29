@@ -23,10 +23,13 @@ self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
 });
 
+// The previous version's files stay one update longer: a page opened just before the update
+// may still ask for them after this worker takes over.
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('xplans-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => keys.filter((k) => k.startsWith('xplans-') && k !== CACHE).slice(0, -1))
+      .then((old) => Promise.all(old.map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -34,8 +37,22 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  const key = req.mode === 'navigate' ? new URL('./', self.location.href).href : req;
-  e.respondWith(caches.match(key).then((hit) => hit || fetch(req)));
+  const mine = caches.open(CACHE);
+  if (req.mode === 'navigate') {
+    // The page always comes from this version.
+    const page = new URL('./', self.location.href).href;
+    e.respondWith(mine.then((c) => c.match(page)).then((hit) => hit || fetch(req)));
+    return;
+  }
+  // This version first; hashed files from the previous one are still right for an older page.
+  // Vary is ignored: a module script asks with an Origin header the stored copy never had.
+  const opts = { ignoreVary: true };
+  e.respondWith(
+    mine
+      .then((c) => c.match(req, opts))
+      .then((hit) => hit || caches.match(req, opts))
+      .then((hit) => hit || fetch(req)),
+  );
 });
 `;
 

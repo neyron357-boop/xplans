@@ -5,7 +5,7 @@ import { coverOk, currentArc, currentGoal, goalLines, reopenLine, runwayLeft, se
 import { daysBetween, plural } from '../lib/dates';
 import { take } from '../lib/handoff';
 import { kindOf } from '../lib/roots';
-import { go, rememberRootsTab, type RootsTab } from '../lib/router';
+import { go, rememberTab, type RootsTab } from '../lib/router';
 import { useCountUp, useToday } from '../lib/useToday';
 import { AceSheet, CloseSheet, GoalSheet, LineSheet, RiskSheet, RunwaySheet } from '../sheets/RootsSheets';
 import { StepSheet } from '../sheets/TodaySheets';
@@ -14,10 +14,10 @@ import { RootsView } from '../ui/RootsView';
 import { Seg } from '../ui/Seg';
 
 export function RootsScreen({ tab }: { tab: RootsTab }) {
-  rememberRootsTab(tab);
+  rememberTab('roots', tab);
   return (
     <main class="screen">
-      <Seg tab={tab} />
+      <Seg section="roots" tab={tab} />
       <div class="tabview" key={tab}>
         {tab === 'tree' && <Tree />}
         {tab === 'ready' && <Ready />}

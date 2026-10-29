@@ -1,4 +1,4 @@
-import type { AppState, Change, Cover, DayKey, DayLog, Goal, Id, Line, Memory, MemoryKind, When } from './model';
+import type { AppState, Change, Cover, DayKey, DayLog, Goal, HabitLink, Id, Line, Memory, MemoryKind, Verdict, When } from './model';
 import { commit } from './store';
 import { dayKey, daysBetween, whenOf } from '../lib/dates';
 import { uid } from '../lib/id';
@@ -78,13 +78,26 @@ export function toggleStep(day: DayKey, lineId: Id) {
   });
 }
 
+const minuteNow = () => {
+  const t = new Date();
+  return t.getHours() * 60 + t.getMinutes();
+};
+
+/** Marking a habit today also notes the time, so its usual hour can show up later. */
 export function toggleHabit(day: DayKey, id: Id) {
   commit((d) => {
     const log = logOf(d, day);
     const done = new Set(log.habits);
-    if (done.has(id)) done.delete(id);
-    else done.add(id);
+    const at = { ...log.habitAt };
+    if (done.has(id)) {
+      done.delete(id);
+      delete at[id];
+    } else {
+      done.add(id);
+      if (day === dayKey()) at[id] = minuteNow();
+    }
     log.habits = [...done];
+    log.habitAt = Object.keys(at).length ? at : undefined;
   });
 }
 
@@ -94,7 +107,7 @@ export function snoozeRunway(day: DayKey) {
   });
 }
 
-export function saveHabits(list: { id?: Id; name: string }[]) {
+export function saveHabits(list: { id?: Id; name: string; link?: HabitLink }[]) {
   commit((d) => {
     const keep = list.filter((h) => h.name.trim());
     const kept = new Set(keep.map((h) => h.id));
@@ -104,8 +117,9 @@ export function saveHabits(list: { id?: Id; name: string }[]) {
       if (old) {
         old.name = h.name.trim();
         old.archived = undefined;
+        old.link = h.link;
       } else {
-        d.habits.push({ id: uid(), name: h.name.trim() });
+        d.habits.push({ id: uid(), name: h.name.trim(), link: h.link });
       }
     }
   });
@@ -313,5 +327,61 @@ export function deleteMemory(id: Id) {
 export function markBackup() {
   commit((d) => {
     d.backupAt = dayKey();
+  });
+}
+
+/* Knowledge */
+
+export function saveStudy(p: { id?: Id; name: string; next: string; lineId: Id | null; measured: boolean }): Id {
+  const id = p.id ?? uid();
+  commit((d) => {
+    const data = { name: p.name.trim(), next: p.next.trim() || undefined, lineId: p.lineId ?? undefined };
+    const old = d.studies.find((x) => x.id === id);
+    if (old) {
+      Object.assign(old, data);
+      // Checks already taken are history; measuring is only switched off before the first one.
+      if (p.measured) old.measure ??= { checks: [] };
+      else if (!old.measure?.checks.length) old.measure = undefined;
+    } else {
+      d.studies.push({ id, ...data, measure: p.measured ? { checks: [] } : undefined, createdAt: dayKey() });
+    }
+  });
+  return id;
+}
+
+export function deleteStudy(id: Id) {
+  commit((d) => {
+    d.studies = d.studies.filter((x) => x.id !== id);
+  });
+}
+
+/** One check a day: a second answer on the same day replaces the first. */
+export function addCheck(studyId: Id, day: DayKey, value: number) {
+  commit((d) => {
+    const m = d.studies.find((x) => x.id === studyId)?.measure;
+    if (!m) return;
+    m.checks = [...m.checks.filter((c) => c.day !== day), { day, value }].sort((a, b) => a.day.localeCompare(b.day));
+  });
+}
+
+/* Me */
+
+export function setVerdict(key: string, v: Verdict | undefined) {
+  commit((d) => {
+    if (v) d.verdicts[key] = v;
+    else delete d.verdicts[key];
+  });
+}
+
+export function saveRules(list: { id?: Id; text: string }[]) {
+  commit((d) => {
+    d.rules = list.filter((r) => r.text.trim()).map((r) => ({ id: r.id ?? uid(), text: r.text.trim() }));
+  });
+}
+
+export function notePause(day: DayKey) {
+  commit((d) => {
+    const log = logOf(d, day);
+    log.pauses = (log.pauses ?? 0) + 1;
   });
 }

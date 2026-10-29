@@ -1,8 +1,11 @@
 import { useState } from 'preact/hooks';
-import type { DayKey, Habit, Id, Line } from '../store/model';
-import { addLine, rememberNow, saveAce, saveHabits, setChange, setStep } from '../store/actions';
+import type { DayKey, Habit, HabitLink, Id, Line } from '../store/model';
+import { useStore } from '../store/store';
+import { addLine, currentGoal, goalLines, rememberNow, saveAce, saveHabits, setChange, setStep } from '../store/actions';
 import { go } from '../lib/router';
 import { Field } from '../ui/Field';
+import { HabitMark, linkedLine } from '../ui/HabitMark';
+import { useFocusNew } from '../ui/useFocusNew';
 import { Pill } from '../ui/Pill';
 import { Sheet } from '../ui/Sheet';
 import { Toggle } from '../ui/Toggle';
@@ -153,33 +156,80 @@ export function StepSheet({ day, line, onClose }: Base & { day: DayKey; line: Li
   );
 }
 
-export function HabitsSheet({ habits, onClose }: Base & { habits: Habit[] }) {
-  const [list, setList] = useState<{ id?: Id; name: string }[]>(() =>
-    habits.length ? habits.map((h) => ({ id: h.id, name: h.name })) : [{ name: '' }],
-  );
-  const rename = (i: number, name: string) => setList(list.map((h, j) => (j === i ? { ...h, name } : h)));
+type HabitDraft = { id?: Id; name: string; link?: HabitLink };
+
+/** The list of habits; each can feed a line or the runway, which gives it that colour. */
+export function HabitsSheet({ habits, add, onClose }: Base & { habits: Habit[]; add?: boolean }) {
+  const s = useStore();
+  const lines = goalLines(s, currentGoal(s)?.id).filter((l) => !l.closed);
+  const [list, setList] = useState<HabitDraft[]>(() => {
+    const now = habits.map((h) => ({ id: h.id, name: h.name, link: h.link }));
+    return add || !now.length ? [...now, { name: '' }] : now;
+  });
+  const [open, setOpen] = useState<number | null>(null);
+  const patch = (i: number, p: Partial<HabitDraft>) => setList(list.map((h, j) => (j === i ? { ...h, ...p } : h)));
+  const link = (i: number, l: HabitLink | undefined) => {
+    patch(i, { link: l });
+    setOpen(null);
+  };
+  const isLine = (h: HabitDraft, id: Id) => h.link?.t === 'line' && h.link.id === id;
+  const { box, willAdd } = useFocusNew(list.length);
   return (
     <Sheet title="Корешки" onClose={onClose}>
       {(close) => (
         <>
           <p class="small muted">Маленькие дела на каждый день.</p>
-          <div class="stack-8">
+          <div class="stack-8" ref={box}>
             {list.map((h, i) => (
-              <div class="row" key={h.id ?? `new-${i}`}>
-                <input
-                  class="input grow"
-                  value={h.name}
-                  aria-label={`Корешок ${i + 1}`}
-                  placeholder="Например: EN · 20 мин"
-                  onInput={(e) => rename(i, e.currentTarget.value)}
-                />
-                <button type="button" class="icon-btn" aria-label="Убрать" onClick={() => setList(list.filter((_, j) => j !== i))}>
-                  ×
-                </button>
+              <div class="stack-8" key={h.id ?? `new-${i}`}>
+                <div class="row">
+                  <input
+                    class="input grow"
+                    value={h.name}
+                    aria-label={`Корешок ${i + 1}`}
+                    placeholder="Например: EN · 20 мин"
+                    data-autofocus={(add && i === list.length - 1) || undefined}
+                    onInput={(e) => patch(i, { name: e.currentTarget.value })}
+                  />
+                  <button
+                    type="button"
+                    class="link-btn"
+                    aria-label={`Куда ведёт корешок ${i + 1}`}
+                    aria-expanded={open === i}
+                    onClick={() => setOpen(open === i ? null : i)}
+                  >
+                    {h.link?.t === 'runway' || linkedLine(s, h.link) ? <HabitMark s={s} link={h.link} /> : <span class="chip chip--empty">→</span>}
+                  </button>
+                  <button type="button" class="icon-btn" aria-label="Убрать" onClick={() => setList(list.filter((_, j) => j !== i))}>
+                    ×
+                  </button>
+                </div>
+                {open === i && (
+                  <div class="pills link-pills" role="group" aria-label="Куда ведёт">
+                    <Pill on={!h.link} onClick={() => link(i, undefined)}>
+                      Сам по себе
+                    </Pill>
+                    {lines.map((l) => (
+                      <Pill key={l.id} on={isLine(h, l.id)} onClick={() => link(i, { t: 'line', id: l.id })}>
+                        <span class="mono">{l.code}</span> {l.name}
+                      </Pill>
+                    ))}
+                    <Pill on={h.link?.t === 'runway'} onClick={() => link(i, { t: 'runway' })}>
+                      ◆ Запас
+                    </Pill>
+                  </div>
+                )}
               </div>
             ))}
           </div>
-          <button type="button" class="ghost ghost--left" onClick={() => setList([...list, { name: '' }])}>
+          <button
+            type="button"
+            class="ghost ghost--left"
+            onClick={() => {
+              willAdd();
+              setList([...list, { name: '' }]);
+            }}
+          >
             + Корешок
           </button>
           <button

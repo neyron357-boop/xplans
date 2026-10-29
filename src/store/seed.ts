@@ -1,5 +1,29 @@
-import type { AppState, DayKey } from './model';
+import type { AppState, DayKey, Id, Rule, Study, Trait } from './model';
 import { whenOf } from '../lib/dates';
+
+/** What is being learned, from the design: English by ear first, the rest tied to lines. */
+export function seedStudies(today: DayKey, lineIds: Set<Id>): Study[] {
+  const line = (id: Id) => (lineIds.has(id) ? { lineId: id } : {});
+  return [
+    { id: 'study-en', name: 'Английский на слух', measure: { start: { low: 40, high: 50 }, checks: [] }, createdAt: today },
+    { id: 'study-design', name: 'Дизайн', next: '3 работы в портфолио', ...line('line-a2'), createdAt: today },
+    { id: 'study-ai', name: 'AI и приложения', next: 'XPlans — твой первый проект', createdAt: today },
+    { id: 'study-parts', name: 'Запчасти', next: 'список магазинов рядом', ...line('line-a'), createdAt: today },
+    { id: 'study-clients', name: 'Клиенты', next: '10 фраз для клиентов на EN', ...line('line-a1'), createdAt: today },
+  ];
+}
+
+export const seedTraits = (): Trait[] => [
+  { id: 'trait-best', text: 'Ищешь лучший вариант слишком долго', fix: 'таймер решения 20 мин' },
+  { id: 'trait-doubt', text: 'Нет прогресса — растут сомнения', fix: 'контрольная серия раз в месяц' },
+  { id: 'trait-spread', text: 'Много направлений сразу', fix: 'одна арка в фокусе, остальное на полке' },
+];
+
+export const seedRules = (): Rule[] => [
+  { id: 'rule-dignity', text: 'Достоинство не обсуждается' },
+  { id: 'rule-fair', text: 'Справедливо — и для других' },
+  { id: 'rule-help', text: 'Попросить помощь — это ход' },
+];
 
 /** First launch starts from the plan in the design, so the app is useful right away. */
 export function seed(today: DayKey): AppState {
@@ -29,8 +53,8 @@ export function seed(today: DayKey): AppState {
     runway: { days: null, setOn: null, threshold: 14, lineId: A1 },
     habits: [
       { id: 'habit-en', name: 'EN · 20 мин' },
-      { id: 'habit-apply', name: 'Отклики' },
-      { id: 'habit-spend', name: 'Траты' },
+      { id: 'habit-apply', name: 'Отклики', link: { t: 'line', id: A } },
+      { id: 'habit-spend', name: 'Траты', link: { t: 'runway' } },
     ],
     days: {},
     memories: [
@@ -50,5 +74,9 @@ export function seed(today: DayKey): AppState {
       { id: 'risk-papers', title: 'Документы', covers: [] },
     ],
     backupAt: null,
+    studies: seedStudies(today, new Set([A, A1, A2])),
+    traits: seedTraits(),
+    verdicts: {},
+    rules: seedRules(),
   };
 }
